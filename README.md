@@ -1,4 +1,4 @@
-# sb_shell
+# sb_javascript
 
 JavaScript sandbox for variety of templates and tutorial snippets.
 
@@ -9,6 +9,9 @@ The ```/doc``` folder of the ```workspace``` repo has the documentation.
 
 I will gradually migrate the notes I have to this repository. So far the here are the snippets:
 
-+ bash
-     - coloring of the output on the terminal
++ website_template001
+     - Simple template of an html website with main page and chapter pages,
+       with the navigation done using javascript header/footer
+       
+       
      
