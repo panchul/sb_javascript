@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>SVG Ball Bounce Overview</title>
+    <!--  <meta http-equiv="X-UA-Compatible" content="IE=Edge"/> Remove this comment only if you have issues rendering this page on an intranet site. -->
+    <link rel="stylesheet" href="base.css" type="text/css" media="screen" />
+</head>
+
+<body id="rulesPage">
+<h1 style="text-align: center;">SVG Ball Bounce</h1>
+<div class="roundCorners">
+    <h2>Overview</h2>
+    <p>
+        The objective is simple &ndash; get your balls into the goal within the allotted time!
+    </p>
+    <p>The time remains the same for each level but the number of balls increases by 1 per level &ndash; this gets difficult quickly!</p>
+</div>
+<div class="roundCorners">
+    <h2>Details</h2>
+    <ul>
+        <li><p>To move the paddle <em>and</em> start the game:</p>
+            <ul>
+                <li>Click anywhere within the browser window and then move the mouse vertically up and down &ndash; this moves the paddle up and down.</li>
+                <li>Press the &uarr; and/or &darr; arrow keys.</li>
+            </ul>
+        </li>
+        <li>If a ball has <strong>not</strong> hit the paddle, it is considered "cold" and cannot enter the goal. Cold balls are white and behave as if the goal doesn't exist (as if the arena wall extends right across the goal entry &ndash; despite the fact that there is no graphical indication of this).</li>
+        <li>If a ball <strong>has</strong> hit the paddle, it is considered "hot", becomes a solid non-white color, and can enter the goal. However, after a finite number of bounces, a hot ball becomes cold (and cannot enter the goal).</li>
+        <li>After a ball becomes hot, the number of remaining bounces it has to enter the goal is displayed. This value is decremented once per bounce until the ball enters the goal or the value reaches zero - which ever comes first. Note that a hot ball's solid color gets closer to white (the cold color) after each bounce.</li>
+        <li>To pause, click anywhere within the browser window or press the &larr; key. To resume a paused game, move the paddle (as described previously).</li>
+        <li>To quit, simply close your browser window.</li>
+        <li>Note that if you start the game with a key press, clicking the paddle will actually pause the game. The next click will resume the paused game.</li>
+    </ul>
+</div>
+<div class="roundCorners">
+    <h2>Tips</h2>
+    <ul>
+        <li>Due to random collisions, if a ball becomes slow or "locked" into a static bounce pattern, it may be best to change the velocity vector of the problematic ball before attempting to score with a faster ball.</li>
+        <li>Not hitting a hot ball with the paddle can be just as advantageous as hitting it with the paddle.</li>
+        <li>Bouncing the ball off of the back of the paddle and onto the far right side of the arena wall (perhaps multiple times) is often helpful.</li>
+        <li>Striking a ball with the paddle such that the ball "rolls" along the arena wall generally results in a goal.</li>
+    </ul>
+</div>
+</body>
+
+</html>

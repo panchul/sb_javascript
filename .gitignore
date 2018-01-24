@@ -1,0 +1,12 @@
+
+# IDE specific
+.idea
+.*.swp
+.*.swo
+*~
+
+# OSX-specific
+.DS_Store
+
+tmp
+

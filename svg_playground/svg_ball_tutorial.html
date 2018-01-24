@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>SVG Ball Bounce</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge"/> <!-- Remove this line in production. -->
+    <link rel="stylesheet" href="base.css" type="text/css" media="screen" />
+</head>
+
+<body id="gamePage" onload="game.init();">
+<div id="rules" class="roundCorners">
+    <p><a href="rules.html" target="_blank">Game Overview</a></p>
+</div>
+<div id="clock" class="roundCorners">
+    <p>Seconds Remaining:</p> <!-- The time value here is filled in via JavaScript. -->
+</div>
+<div id="score" class="roundCorners">
+    <p>Score: 0</p>
+</div>
+<div id="level" class="roundCorners">
+    <p>Level: 1</p>
+</div>
+<div id="messagingBox" class="roundCorners"> <!-- Used to display various messages to the user. -->
+    <h3>SVG Ball Bounce</h3>
+    <p>See the game overview for playing tips and tricks.</p>
+</div>
+<div id="arenaWrapper">
+    <svg id="arenaBox" width="100%" height="100%" viewBox="0 0 800 800">
+        <g id="arena" transform="translate(400, 400)">
+            <circle id="floor" cx="0" cy="0" /> <!-- The arena floor -->
+            <path id="wall" /> <!-- The arena wall less the goal hole. -->
+            <circle id="post" cx="0" cy="0" /> <!-- The central post in the middle of the arena. -->
+            <rect id="paddle" x="300" y="-50" width="8" height="100" rx="2" ry="2"/>
+            <!-- Ball circle elements are appended here via JavaScript. -->
+        </g>
+    </svg>
+</div>
+<script src="vector.js" type="text/javascript"></script>
+<script src="helpers.js" type="text/javascript"></script>
+<script>
+    "use strict";
+
+    /* --- CONSTANTS ----------------------------------------------------------------------------------------- */
+
+    var constants = {
+      leftArrow: 37, // The numeric code for the left arrow key.
+      upArrow: 38,
+      downArrow: 40,
+      arenaRadius: 400, // The radius of the arena floor (i.e., the largest outer circle).
+      postRadius: 50, // The radius of the center post blocking the goal exit.
+      goalSize: 15 * (Math.PI / 180), // The angular size, in radians, of one half of the goal exit, 10 degrees in this case.
+      paddleDy: 20, // The amount to move the paddle (in the vertical direction) when either the up or down arrow key is pressed.
+      playTime: 120, // The number of seconds of play time for all levels.
+      warningTime: 10, // Warn the player that the game is going to end in constantss.warningTime seconds.
+      pulseDelay: 20, // The number of milliseconds to pulse the arena's floor color when only constants.warningTime seconds of game time remain. constants.pulseDely must be smaller than 1000 ms.
+      pulseColor: "red", // The pulse color for the arena floor.
+      gameDelay: 10, // game.play() is called every gameDelay milliseconds. This affects animation smoothness.
+      coldBallColor: "white", // The initial color for all the balls before they become hot.
+      ballStrokeColor: "black", // The color the border for all balls (less the arena).
+      ballStrokeWidth: 2, // How thick the "walls" of the balls are.
+      epsilon: 1, // Coefficient of restitution. 1 means a perfectly elastic collision (rock hard superballs), 0 means a perfectly inelastic collision (super sticky clay balls.
+      minSpeed: 100, // In pixels per second. The x and y-components of the velocity vectors for the balls will be randomly chosen and be between minSpeed and maxSpeed.
+      maxSpeed: 200, // In pixels per second. The x and y-components of the velocity vectors for the balls will be randomly chosen and be between minSpeed and maxSpeed.
+      minRadius: 10, // The minimum radius for the randomly sized ball.
+      maxRadius: 40, // The maximum radius for the randomly sized ball.
+      hotBounces: 15, // The number of bounces a ball has after it strikes the paddle to enter the goal.
+      poofDelta: 0.25, // To increase the animation speed at which a ball "poofs" away after it enters the goal, increase this value.
+      affirmingMessageDelay: 3000, // The number of milliseconds to "pause" the game between levels.
+      arenaDeadlock: 100, // See the WHILE loop in Arena.prototype.processCollision for details.
+      moveTowardCenterDelta: 1 // See SVGCircleElement.prototype.moveTowardCenter for details.
+    };
+
+    /* -- ARENA ITEMS ---------------------------------------------------------------------------------------- */
+
+    function Arena(gameObject) {
+      this.game = gameObject; // Now the arena object can refer to the game object that contains it.
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Arena.prototype.draw = function () {
+      /*
+        Draws the "donut" shaped game arena area. Assumes that the "floor", "wall", and "post" SVG elements
+        already exist.
+      */ 
+      var floor = document.getElementById('floor'); // Required for Firefox (not necessary for IE9 or Chrome).
+      floor.r.baseVal.value = constants.arenaRadius;
+
+      var x = constants.arenaRadius * Math.cos(constants.goalSize); // The x-coordinate of a point somewhere on the arena circle.
+      var y = constants.arenaRadius * Math.sin(constants.goalSize); // The y-coordinate of a point somewhere on the arena circle.
+      var wall = document.getElementById('wall'); // Required for Firefox (not necessary for IE9 or Chrome).
+      var wallStart = wall.createSVGPathSegMovetoAbs(-x, y); // The starting point of the arena wall arc.
+      var wallArc = wall.createSVGPathSegArcAbs(-x, -y, constants.arenaRadius, constants.arenaRadius, 0, 1, 0); // The end point of the arena wall arc (and the arc definition).
+      wall.pathSegList.appendItem(wallStart); // Analogous to an "M" command for a path.
+      wall.pathSegList.appendItem(wallArc); // Analogous to an "A" command for a path.
+
+      var post = document.getElementById('post'); // Required for Firefox (not necessary for IE9 or Chrome).
+      post.r.baseVal.value = constants.postRadius;
+
+      updateClock(this.game.time); // A helper function that displays the remaining game time.
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Arena.prototype.defaultFloorColor = function () {
+      /*
+        Changes the arena floor color to its default color (after the red warning color flashes).
+      */ 
+      var floor = document.getElementById('floor'); // Required for Firefox (not necessary for IE9 or Chrome).
+
+      floor.style.fill = "white";
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Arena.prototype.hasCollided = function (ball) {
+      /*
+        Returns true if the given ball has struck either the outer arena wall or the inner arena wall (i.e, the
+        inner post); false otherwise.
+      */ 
+      var cx = ball_cx(ball); // The x-coordinate for the center of the ball.
+      var cy = ball_cy(ball); // The y-coordinate for the center of the ball.
+      var d = Math.sqrt(cx * cx + cy * cy); // The distance from the arena's center (i.e., origin) to the ball's center.
+      var r = ball_r(ball); // The radius of the ball.
+
+      return (d + r >= constants.arenaRadius) || (d - r <= constants.postRadius); // Draw this on paper and it'll make sense.
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Arena.prototype.processCollision = function (ball) {
+      /*
+        Detects if a ball hits the arena wall and if so, changes the ball's direction appropriately. The key
+        equation for vector reflection is v2 = v1 - 2(v1 dot n)n. See http://mathworld.wolfram.com/Reflection.html
+        for details.
+
+        With respect to the vector equation v2 = v1 - 2(v1 dot n)n, let s = 2(v1 dot n). Thus, the equation becomes
+        v2 = v1 - s*n. This form will be used in the following:
+      */ 
+      if (this.hasCollided(ball) && !ball.inactive) {
+        if (ball.hotCount > 0) { // If true, the ball has been struck by the paddle and still has some hot bounces left to get into the goal.
+          --ball.hotCount; // Decrement the ball's hot count once per arena wall bounce (for both the inner and outer walls).
+          updateMessagingBox("Ball " + ball.i + ": " + ball.hotCount + " bounces left to score.");
+
+          ball.style.fillOpacity = ball.hotCount / constants.hotBounces; // Decrease the ball's opacity value once per bounce.
+          if (ball.style.fillOpacity == 0)
+            ball.style.fill = constants.coldBallColor; // Visually indicate that the ball is no longer hot but 100% cold.
+        }
+
+        var n = new Vector(0, 0); // An "empty" unit vector that will be normal to the point of ball-arena collision.
+        var s; // A scalar representing 2(v1 dot n), as described in the above comment.
+        var v1 = ball.v; // The ball's incoming velocity vector (i.e., pre-collision v).
+        var v2; // The ball's outgoing velocity vector (i.e., post-collision v).
+        var cx = ball_cx(ball); // The x-coordinate for the center of the ball.
+        var cy = ball_cy(ball); // The y-coordinate for the center of the ball.
+        var theta = Math.atan2(cy, cx); // The angle of the ball's center from the positive x-axis, in radians.
+
+        n.xc = Math.cos(theta); // The x-component of the normal unit vector for the point of ball-arena collision.
+        n.yc = Math.sin(theta); // The y-component of the normal unit vector for the point of ball-arena collision.
+
+        s = 2 * v1.dot(n); // The scalar quantity 2(v1 dot n).
+        v2 = v1.diff(n.multi(s)); // The ball's outgoing velocity vector (after the wall collision).
+
+        v2.xc *= constants.epsilon; // Coefficient of restitution. 1 means a perfectly elastic collision (superballs), 0 means a perfectly inelastic collision (sticky clay balls).
+        v2.xc *= constants.epsilon; // Coefficient of restitution. 1 means a perfectly elastic collision (superballs), 0 means a perfectly inelastic collision (sticky clay balls).
+
+        ball.v = v2; // Change the ball's direction of travel per the vector reflection equation.
+
+        var loopCount = 0;
+        while (this.hasCollided(ball)) {
+          // F12Log("In Arena.prototype.processCollision while loop...");
+          if (++loopCount > constants.arenaDeadlock) // A deadlock between ball.move() and this.hasCollided(ball) can (rarely) occur in this loop.
+            ball.moveTowardCenter(); // This just picks the ball up from its current location and moves it directly towards the center of the arena by a small amount. This breaks the deadlock.
+          else
+            ball.move(); // Normally move the ball away from the arena wall.
+        }
+      }
+    }
+
+    /* -- GOAL ITEMS ----------------------------------------------------------------------------------------- */
+
+    function Goal(gameObject) {
+      this.game = gameObject; // Now the goal object can refer to the game object that contains it.
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Goal.prototype.hasCollided = function (ball) {
+      /*
+        Returns true if the given ball has collided with the goal, false otherwise.
+      */ 
+      var cx = ball_cx(ball); // The x-coordinate for the center of the ball.
+      var cy = ball_cy(ball); // The y-coordinate for the center of the ball.
+      var d = Math.sqrt(cx * cx + cy * cy); // The distance from the arena's center (i.e., origin) to the ball's center.
+      var r = ball_r(ball); // The radius of the ball.
+      var theta = Math.abs(Math.atan2(cy, cx)); // The angle of the ball's center from the positive x-axis, in radians. Note that 0 <= theta <= 180.
+
+      return (d + r >= constants.arenaRadius) && (theta >= Math.PI - constants.goalSize); // Math.PI radians equals 180 degrees.
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Goal.prototype.processCollision = function (ball) {
+      if (this.hasCollided(ball) && ball.hotCount > 0 && !ball.inactive) {
+        updateMessagingBox("Score! (ball " + ball.i + " gone)");
+        ++this.game.score; // The player just scored a point for getting a hot ball into the goal.
+        updateScoreBox(this.game.score); // Player gets a point for a score!
+        ball.poof(); // Performs the animation to make the ball disappear on screen (you can only fully see this effect in IE).
+        ball.inactive = true; // Mark the ball as inactive in the ball list.
+        if (this.game.balls.allInactive()) // If the number of "active" balls is zero, then this level of the game is over. Note that there's no need to check the game clock time - that's handled elsewhere.
+          this.game.nextLevel(); // Go to the next game level.
+      }
+    }
+
+    /* -- PADDLE ITEMS --------------------------------------------------------------------------------------- */
+
+    function Paddle(gameObject) {
+      this.game = gameObject; // Now the paddle object can refer to the game object that contains it.
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Paddle.prototype.keyMove = function (direction) {
+      /*
+        Recall that the y-axis is negative above the origin and positive below the origin.
+      */ 
+      var paddle = document.getElementById('paddle'); // Required for Firefox (not necessary for IE9 or Chrome).
+      var paddleHeight = paddle.height.baseVal.value; // How tall the paddle is, in SVG user units.
+      var maxY = Math.sqrt((constants.arenaRadius * constants.arenaRadius) - (paddle.x.baseVal.value * paddle.x.baseVal.value)); // The positive maximum value that the paddle can move before it goes outside of the arena.
+
+      if (direction === "U")
+        paddle.y.baseVal.value -= constants.paddleDy;
+      else if (direction === "D")
+        paddle.y.baseVal.value += constants.paddleDy;
+      else
+        alert("Error in Paddle.prototype.keyMove()");
+
+      var paddleTop = paddle.y.baseVal.value; // The current top of the paddle. Recall that the y-axis is negative above the origin.
+      if (paddleTop <= -maxY) { // The y-axis is negative above the origin.
+        paddle.y.baseVal.value = -maxY; // Don't move the paddle beyond the bounds of the arena.
+        return;
+      }
+
+      var paddleBottom = paddleTop + paddleHeight; // The current bottom of the paddle. Recall that the y-axis is positive below the origin.
+      if (paddleBottom >= maxY) { // The y-axis is positive below the origin.
+        paddle.y.baseVal.value = maxY - paddleHeight; // Don't move the paddle beyond the bounds of the arena.
+        return;
+      }
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Paddle.prototype.mouseMove = function (evt) {
+      /*
+        The parameter evt is a mouse move event object. Assumes that this function is initially invoked when the paddle has been clicked for the first time.
+      */ 
+      if (this.game.ended || this.game.paused) // Don't process any mouse movements (and thus move the paddle) if the game has ended or has been paused.
+        return;
+
+      var paddle = document.getElementById('paddle'); // Required for Firefox (not necessary for IE9 or Chrome).
+      var arena = document.getElementById('arena'); // Required for Firefox (not necessary for IE9 or Chrome).
+      var maxY = Math.sqrt((constants.arenaRadius * constants.arenaRadius) - (paddle.x.baseVal.value * paddle.x.baseVal.value)); // The positive maximum value that the paddle can move before it goes outside of the arena.
+
+      var arenaBox = document.getElementById('arenaBox'); // Required for Firefox. Note that this is the root (and only) SVG element in the page).
+      var point = arenaBox.createSVGPoint(); // Create a new SVG point object so that we can (ultimately) access its matrixTransform() method in function coordinateTransform().
+      point.x = evt.pageX; // Transfer the screen coordinates of the mouse to the SVG point object.
+      point.y = evt.pageY; // For paddle movement, this is the only value we actually care about.
+
+      point = coordinateTransform(point, arena); // Map the screen coordinate to the coordinate system associated with the arena object (which is due to <g id="arena" transform="translate(400, 400)">).
+
+      var paddleHeight = paddle.height.baseVal.value; // How tall the paddle is, in SVG user units.
+      paddle.y.baseVal.value = point.y - (paddleHeight / 2); // Because paddle.y.baseVal.value is already in arena system coordinates (i.e., <g id="arena" transform="translate(400, 400)">), we done. We just need to subtract off half the height of the paddle to center the paddle under the mouse.
+
+      var paddleTop = paddle.y.baseVal.value; // The current top of the paddle. Recall that the y-axis is negative above the origin.
+      if (paddleTop <= -maxY) { // The y-axis is negative above the origin.
+        paddle.y.baseVal.value = -maxY; // Don't move the paddle beyond the bounds of the arena.
+        return;
+      }
+
+      var paddleBottom = paddleTop + paddleHeight; // The current bottom of the paddle. Recall that the y-axis is positive below the origin.
+      if (paddleBottom >= maxY) { // The y-axis is positive below the origin.
+        paddle.y.baseVal.value = maxY - paddleHeight; // Don't move the paddle beyond the bounds of the arena.
+        return;
+      }
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Paddle.prototype.hasCollided = function (ball) {
+      /*
+        Returns true if a ball has collided with the paddle, false otherwise.
+      */ 
+      var paddle = document.getElementById('paddle'); // Needed for Firefox. Not needed for IE or Chrome.
+      var p = new Object(); // To save on typing, create a generic object to hold assorted paddle related values ("p" stands for "paddle").
+
+      p.x = paddle.x.baseVal.value; // The x-coordinate for the upper left-hand corner of the paddle rectangle.
+      p.y = paddle.y.baseVal.value; // The y-coordinate for the upper left-hand corner of the paddle rectangle.
+      p.w = paddle.width.baseVal.value; // The width of the paddle rectangle.
+      p.h = paddle.height.baseVal.value; // The height of the paddle rectangle.
+
+      p.delta_x = Math.abs(ball_cx(ball) - p.x - p.w / 2); // The distance between the center of the ball and the center of the paddle, in the x-direction.
+      p.delta_y = Math.abs(ball_cy(ball) - p.y - p.h / 2); // The distance between the center of the ball and the center of the paddle, in the y-direction.
+
+      // See if the ball has NOT collided with the paddle in the x-direction and the y-direction:  */
+      if (p.delta_x > (p.w / 2 + ball_r(ball))) { return false; }
+      if (p.delta_y > (p.h / 2 + ball_r(ball))) { return false; }
+
+      // See if the ball HAS collided with the paddle in the x-direction or the y-direction:  */
+      if (p.delta_x <= (p.w / 2)) { return true; }
+      if (p.delta_y <= (p.h / 2)) { return true; }
+
+      // If we've gotten to this point, check to see if the ball has collided with one of the corners of the paddle:  */
+      var corner = new Object(); // A handy object to hold paddle corner information.
+      corner.delta_x = p.delta_x - p.w / 2;
+      corner.delta_y = p.delta_y - p.h / 2;
+      corner.distance = Math.sqrt((corner.delta_x * corner.delta_x) + (corner.delta_y * corner.delta_y));
+      return corner.distance <= ball_r(ball);
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Paddle.prototype.verticalBounce = function (ball) {
+      /*
+        For each vertical point along the paddle surface, a ball always bounces off of the paddle at the same
+        angle regardless of the angle the ball had before it struck the paddle. That is, there is a unit
+        vector u for each point along the vertical surfaces of the paddle that makes a certain angle theta to
+        the normal of the vertical surface. This angle theta varies linearly from -45 degrees at one corner of
+        the paddle to +45 degrees at the other corner of the paddle (and is 0 degrees midway between the two
+        corners). Now each ball strikes the paddle with a certain velocity vector v1 (and magnitude |v1|).
+        Thus, the ball bounces away with a velocity of v2 = |v1|*u (where the direction of u is a function of
+        the point of ball/paddle contact).
+      */ 
+      var paddle = document.getElementById('paddle'); // Required for Firefox.
+      var yDelta = 45 - (-45); // Change in y. The unit vector will tilt from 45 degrees (at one paddle end) to -45 degrees (at the other end of the paddle).
+      var xDelta = paddle.height.baseVal.value - 0; // Change in x. The length of the paddle. -45 to +45 degrees are linearly spread out across this distance.
+      var m = yDelta / xDelta; // Slope m. Degrees per unit paddle length.
+      var b = -45; // The y-intercept is -45 degrees, meaning that when the ball strikes the end of the paddle, the tilt angle of the unit vector is -45 degrees.
+
+      var d; // For the y-direction, ball/paddle distance. See next if-else block for details:
+
+      if (ball_cy(ball) <= paddle.y.baseVal.value) // If true, the ball has struck a vertical surface of the paddle such that the ball's center is above the paddle.
+        d = 0; // For a ball that strikes a vertical surface of the paddle such that the ball's center is above the paddle top, treat it as if the collision occurred exactly at a top corner of the paddle.
+      else if (ball_cy(ball) >= (paddle.y.baseVal.value + paddle.height.baseVal.value)) // If true, the ball as struck a vertical surface of the paddle such that the ball's center is below the bottom of the paddle.
+        d = paddle.height.baseVal.value; // For a ball that strikes a vertical surface of the paddle such that the ball's center is below the paddle bottom, treat it as if the collision occurred exactly at a bottom corner of the paddle.
+      else // The ball struck a vertical surface of the paddle somewhere between the top and bottom of the paddle.
+        d = ball_cy(ball) - paddle.y.baseVal.value; // For the y-direction, the distance from the top edge of the paddle to the ball's center (recall that the y-axis is positive below the x-axis).
+
+      var uAngle = m * d + b; // This linear equation assumes the ball has struck the paddle somewhere between the top and bottom of the paddle. Note that uAngle is in degrees.
+
+      if (ball.v.xc >= 0) // The ball has struck the left (vertical) side of the paddle.
+        uAngle = 180 - uAngle;
+
+      uAngle = (Math.PI / 180) * uAngle; // Convert to radians (all JavaScript trig functions assume radians).
+
+      // Build the (possibly) tilted unit vector:
+      var u = new Vector(0, 0); // The unit vector u, as described in the above comment.
+      u.xc = Math.cos(uAngle);
+      u.yc = Math.sin(uAngle);
+
+      return u.multi(ball.v.magnitude()); // That is, v2 = |v1|*u
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Paddle.prototype.processCollision = function (ball) {
+      /*
+        If the given ball has struck the paddle, this changes the ball's velocity appropriately.
+      */ 
+      if (this.hasCollided(ball)) { // If true, the ball is just touching the padding somewhere.
+        var paddle = document.getElementById('paddle'); // Required for Firefox.
+
+        ball.style.fillOpacity = "1"; // The ball is hot again, so give it a solid color.
+        if (!ball.hotCount) // Only let the ball turn a non-white color when it's cold. This works because, initially, ball.hotCount is undefined (i.e., when the game first starts and all balls are cold) so !ball.hotCount is true in this case. After this, the only case when !ball.hotCount is true is when ball.hotCount equals zero (meaning the ball is cold). Thus, if ball.hotCount is undefined or 0, the ball is cold.
+          ball.style.fill = getRandomColor(); // When the ball becomes hot, randomly choose a non-white color for the ball.
+
+        ball.hotCount = constants.hotBounces; // The ball now has "constants.hotBounces" bounces to enter the goal.
+        updateMessagingBox("Ball " + ball.i + ": " + ball.hotCount + " bounces left to score.");
+
+        var horzD = Math.abs(ball_cx(ball) - paddle.x.baseVal.value - paddle.width.baseVal.value / 2); // The distance between the center of the ball and the center of the paddle, in the x-direction.
+
+        if (horzD < paddle.width.baseVal.value / 2) // The ball has collided with a horizontal surface of the paddle.
+          ball.v.yc = -ball.v.yc; // Do a standard ball/wall bounce for a flat horizontal surface.
+        else // The ball has collided with a vertical surface of the paddle.
+          ball.v = this.verticalBounce(ball); // The angle of the outgoing bounce of the ball is always the same (for a given ball/paddle collision point).
+      }
+
+      while (this.hasCollided(ball)) { // This is a hack to stop the ball from "sticking" to the paddle.
+        // F12Log("In Paddle.prototype.processCollision while loop...");
+        ball.move(); // At any cost, get the ball away from the paddle such that it's not touching it anymore.
+      }
+    }
+
+    /* -- BALL ITEMS ----------------------------------------------------------------------------------------- */
+
+    function Balls(gameObject) {
+      /*
+        Ball constructor function. Also contains the list of balls for any level of the game. Note that because
+        the set of balls knows about the game object, it also knows about the paddle object (since the paddle
+        object is contained with the game object).
+      */ 
+      this.game = gameObject; // Now the set of balls can refer to the game object that contains it.
+      this.list = []; // Each ball element is stored in this array.
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    SVGCircleElement.prototype.move = function () {
+      /*
+        In this game, the SVG circle element is a ball, so add a custom method to it. This method moves this ball
+        across the screen based on the ball's velocity.
+      */ 
+      this.cx.baseVal.value += s2d(this.v.xc); // Given the x-component of the ball's velocity vector, make the ball move in the x-direction.
+      this.cy.baseVal.value += s2d(this.v.yc); // Given the y-component of the ball's velocity vector, make the ball move in the y-direction.
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    SVGCircleElement.prototype.hasCollided = function (that) {
+      /*
+        In this game, the SVG circle element is a ball, so add a custom method to it. This method moves this ball
+        across the screen based on the ball's velocity. This method returns true if "this" ball is touching or
+        overlapping "that" ball.
+      */ 
+      var delta_x = ball_cx(this) - ball_cx(that);
+      var delta_y = ball_cy(this) - ball_cy(that);
+      var d = Math.sqrt((delta_x * delta_x) + (delta_y * delta_y)); // The distance between the center points of ball A and B. This is the classic distance-between-two-points formula.
+
+      if (this.i === that.i) // Return false if both balls are the same ball (i.e., a ball cannot collide with itself) - just a safety measure here.
+        return (false);
+
+      return d <= (ball_r(this) + ball_r(that)); // If the distance between the "this" ball and the "that" ball is less <= to the sum of their radii, then thee two balls must have collided.
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    SVGCircleElement.prototype.collisionN = function (that) {
+      /*
+        Returns a unit vector that is normal to the point of contact between ball A (i.e., "this") and
+        ball B (i.e., "that").
+      */ 
+      var gv = new Vector(0, 0); // Create a generic vector object.
+      var delta_y = ball_cy(this) - ball_cy(that);
+      var delta_x = ball_cx(this) - ball_cx(that);
+
+      var theta = Math.atan2(delta_y, delta_x); // The angle, in radians, that the line connecting the centers of ball A and B makes relative to the positive x-axis.
+
+      gv.xc = Math.cos(theta); // The x-component of the unit normal vector.
+      gv.yc = Math.sin(theta); // The y-component of the unit normal vector.
+
+      return gv;
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    SVGCircleElement.prototype.collisionResponse = function (that) {
+      /*
+        Processes the collision of ballA (i.e., "this") and ballB (i.e., "that") based on the mathematics presented
+        in the "Have Collision, Will Travel" section of http://www.essentialmath.com/CollisionResponse.pps
+      */ 
+      var Vab = this.v.diff(that.v); // The difference of vector ballA.v and ballB.v (i.e., ballA.v - ballB.v), which is the relative velocity.
+      var n = this.collisionN(that); // Calculates a unit vector that is normal to the point of ball-to-ball contact.
+      var Ma = radiusToMass(ball_r(this)); // Returns an appropriate value for the mass of ball A based on its radius.
+      var Mb = radiusToMass(ball_r(that)); // Returns an appropriate value for the mass of ball B based on its radius.
+      var f; // The magnitude of the collision "impulse" between ball A and ball B such that momentum is conserved.
+      var f_numerator; // Break the calculation for f into two parts, its numerator and denominator.
+      var f_denominator;
+
+      f_numerator = -(1 + constants.epsilon) * Vab.dot(n); // For this and the remaining lines, see http://www.essentialmath.com/CollisionResponse.pps for details.
+      f_denominator = n.dot(n) * (1 / Ma + 1 / Mb);
+      f = f_numerator / f_denominator;
+
+      this.v = this.v.add(n.multi(f / Ma)); // Per the collision, change the direction of ball A appropriately.
+      that.v = that.v.diff(n.multi(f / Mb)); // Per the collision, change the direction of ball B appropriately.
+
+      /* If the two balls should overlap, do not proceed until they've been moved apart in the correct direction
+         such that they do not overlap (this is essentially a hack for sub-optimal collision detection and can
+         result in balls appearing to lunge ahead unexpectedly): */
+      while (this.hasCollided(that)) {
+        // F12Log("In SVGCircleElement.prototype.collisionResponse while loop...");
+        this.move();
+        that.move();
+      }
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    SVGCircleElement.prototype.poof = function () {
+      /*
+        For the screen, makes the ball disappear.
+      */ 
+      var ballObject = this; // JavaScript closure thing.
+
+      this.poofID = setInterval(function () { poofer(ballObject); }, constants.gameDelay); // The helper function poofer(this) reduces the ball's radius until it's zero, at which point the function clears this.poofID. To change "poofing" animation speed, tweak constants.poofDelta.
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    SVGCircleElement.prototype.moveTowardCenter = function () {
+      /*
+        Moves this ball towards the arena center by a small amount.
+      */ 
+      var cx = ball_cx(this);
+      var cy = ball_cy(this);
+      var r = Math.sqrt(cx * cx + cy * cy); // The distance from the center of the arena to the ball's center.
+      var theta = Math.atan2(cy, cx); // Angle, in radians, of the ball's center from the positive x-axis.
+
+      r = r - constants.moveTowardCenterDelta; // Move the ball towards the center of the arena by a small amount.
+
+      this.cx.baseVal.value = r * Math.cos(theta); // Convert from polar coordinates back to rectangular coordinates.
+      this.cy.baseVal.value = r * Math.sin(theta);
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Balls.prototype.processCollisions = function (ball) {
+      /*
+        Loop through the set of balls to see if any of them have collided with the given ball.
+      */ 
+      for (var i = 0; i < this.list.length; i++) {
+        if (i === ball.i)
+          continue; // Don't test to see if the ball has collided with itself.
+
+        if (ball.hasCollided(this.list[i])) // If true, ball A (i.e., "ball") has collided with ball B (i.e., "this.list[i]").
+          ball.collisionResponse(this.list[i]); // These two balls have collided, change their velocity vectors appropriately.
+      }
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Balls.prototype.allInactive = function () {
+      /*
+        Returns true if all the ball(s) for the current game level are inactive, false otherwise.
+      */ 
+      var inactiveCount = 0; // The current number of inactive balls for this game level.
+
+      for (var i = 0; i < this.list.length; i++) {
+        if (this.list[i].inactive)
+          ++inactiveCount;
+      }
+
+      return this.list.length === inactiveCount;
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Balls.prototype.create = function () {
+      /*
+        This creates all the ball elements (i.e., SVG circle elements) along with a number of custom properties,
+        and places them within an array.
+      */ 
+      var p; // Receives a point object, representing some point in the xy-plane.
+      var ballElement; // Receives a <circle> element.
+
+      for (var i = 0; i < this.game.level; i++) { // The current level of the game is also the number of balls for that level.
+        ballElement = document.createElementNS("http://www.w3.org/2000/svg", "circle"); // Create a "ball" element.
+
+        ballElement.i = i; // A customer property, each ball should know its own index array value.
+        ballElement.id = "ball" + i; // Each ball must have a unique DOM id value.
+        ballElement.inactive = false; // Initially, all balls are in play.
+
+        ballElement.r.baseVal.value = getRandomBallRadius(); // Set the radius of the ball.
+
+        p = getRandomArenaPosition(ballElement.r.baseVal.value); // For this function, the radius of a ball is needed to make sure that the ball is contained within the "donut" shaped arena.
+        ballElement.cx.baseVal.value = p.x;
+        ballElement.cy.baseVal.value = p.y;
+
+        ballElement.v = new Vector(getRandomSpeed(), getRandomSpeed()); // Give the ball element a custom velocity vector object (whose x and y components are randomly chosen).
+
+        ballElement.style.fill = constants.coldBallColor; // A ball is turned a random non-white color when it becomes hot (by striking the paddle).
+        ballElement.style.stroke = constants.ballStrokeColor;
+        ballElement.style.strokeWidth = constants.ballStrokeWidth;
+
+        this.list[i] = ballElement; // Store the ball in the ball list.
+      }
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Balls.prototype.positionInArena = function () {
+      /*
+        Before the balls are appended to the DOM, this randomly arranges the balls within the "donut" shaped arena
+        such that none of the balls overlap with themselves or the paddle.
+      */ 
+      var point; // Receives a point object representing the current position of a ball.
+
+      if (this.list.length === 1) { // If there's only one ball to position, then just make sure it doesn't overlap with the paddle; then exit.
+        while (this.game.paddle.hasCollided(this.list[0])) {
+          point = getRandomArenaPosition(ball_r(this.list[0])); // Returns an object representing a 2D point in the "donut" shaped arena.
+          this.list[0].cx.baseVal.value = point.x;
+          this.list[0].cy.baseVal.value = point.y;
+        }
+        return;
+      }
+
+      // Assert: There is more than one ball.
+
+      do { // Now make sure that none of the balls physically overlap within the arena (using an inelegant brute force algorithm):
+        var overlap = false; // Assume that none of the balls physically overlap.
+
+        for (var i = 0; (i < this.list.length) && !overlap; i++) {
+          for (var j = 0; (j < this.list.length) && !overlap; j++) {
+            if (i === j)
+              continue; // Breaks the current loop and continues with the next j value.
+
+            if (this.list[i].hasCollided(this.list[j]) || this.game.paddle.hasCollided(this.list[i])) { // Note that the ball set (i.e., "this") has a link to its game object, which has a link to its paddle object, allowing us to invoke the paddle's hasCollided() method.
+              point = getRandomArenaPosition(ball_r(this.list[i])); // Returns an object representing a 2D point in the "donut" shaped arena.
+              this.list[i].cx.baseVal.value = point.x;
+              this.list[i].cy.baseVal.value = point.y;
+              overlap = true;
+            }
+          } // Inner "j" FOR loop.
+        } // Outer "i" FOR loop.
+      } while (overlap);
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Balls.prototype.appendToDOM = function () {
+      /*
+        Takes the array of ball elements and appends them to the DOM, thus rendering them on the screen. These
+        ball(s) are now ready to be played with.
+      */ 
+      var arena = document.getElementById("arena"); // Required for Mozilla, this line not necessary for IE9 or Chrome.
+
+      for (var i = 0; i < this.list.length; i++)
+        arena.appendChild(this.list[i]); // Append a ball (i.e., a circle element with custom properties) to the "donut" shaped arena floor.
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Balls.prototype.place = function () {
+      /*
+        Places the balls into the "donut" shaped game arena.
+      */ 
+      this.create(); // The number of balls for any given game level equals the current game level.
+      this.positionInArena(); // Position the balls in the "donut" arena such that none of them overlap.
+      this.appendToDOM(); // This renders the balls on screen.
+    }
+
+    /* -- GAME ITEMS ----------------------------------------------------------------------------------------- */
+
+    function Game(level) {
+      this.paused = true; // Used to indicate that the game has been paused (or not). Note that a game that has not started yet has the state of this.paused = true.
+      this.ended = false; // A game must start before it can end.
+      this.level = level; // The current game level, level 1 gets one ball, level 2 gets two balls, etc.
+      this.score = 0; // The total score for all levels.
+      this.time = constants.playTime; // Each game level gets the same amount of time.
+      this.arena = new Arena(this); // The "donut" shaped game arena should know what game it belongs to, hence the constructor's argument.
+      this.goal = new Goal(this); // The goal should know what game it belongs to.
+      this.paddle = new Paddle(this); // The paddle should know what game it belongs to, hence the constructor's argument.
+      this.balls = new Balls(this); // The set of balls should know what game it belongs to (i.e., "this").
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Game.prototype.play = function () {
+      /*
+        This method handles game play and is called (via requestAnimationFrame) about every 16.7 milliseconds 
+        (i.e., about 60 FPS). This method does not handle game time keeping - see the clock() method for that. 
+        Note that this play() method is called more times per second than the clock() method (which is called 
+        just once per second).
+      */
+      for (var i = 0; i < this.balls.list.length; i++) { // Loop through each ball currently in play.
+        if (this.balls.list[i].inactive) // If true, the ball has exited the arena via the goal.
+          continue; // Ignore balls that have already gone through the goal.
+        this.balls.list[i].move(); // Move the ball by a small amount.
+        // F12Log("ID = " + this.balls.list[i].i + ", x = " + this.balls.list[i].cx.baseVal.value + ", y = " + this.balls.list[i].cy.baseVal.value);
+        this.goal.processCollision(this.balls.list[i]); // See if a hot ball has struck the goal and if so, increment the score. Note that this must occur before the other .processCollision routines since they can additionally move the ball.
+        this.balls.processCollisions(this.balls.list[i]); // If this ball has collided with another, change the direction of both.
+        this.paddle.processCollision(this.balls.list[i]); // If this ball has collided with the paddle, change the direction of the ball.
+        this.arena.processCollision(this.balls.list[i]); // If this ball has collided with the arena wall, change the direction of the ball.
+      }
+      var that = this; // Preserves the correct "this" pointer.
+      this.requestAnimationFrameID = requestAnimationFrame(function () { that.play(); });
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Game.prototype.pause = function () {
+      this.paused = true;
+      cancelAnimationFrame(this.requestAnimationFrameID); // Halt the game.
+      clearInterval(this.clockID); // Halt the game clock.
+      updateMessagingBox('Game currently paused...');
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Game.prototype.end = function () {
+      this.pause(); // Effectively stops the game.
+      this.ended = true;
+      updateMessagingBox('To play again, refresh the page.');
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Game.prototype.clock = function () {
+      /*
+        Decrement the "Seconds Remaining" display once per 1000 ms (i.e., once per second). Assumes the "clock" element is fully loaded before this function is called.
+      */ 
+      --this.time; // Since this function is invoked once per second, decrement the time remaining by 1 time unit.
+
+      updateClock(this.time); // A helper function that displays the remaining game time.
+
+      if (this.time === 0) { // This clock() method will be the first to discover that the game has ended.
+        this.end(); // End the game.
+        return; // No point in pulsing the arena floor (i.e., the next IF statement) since the game is over.
+      }
+
+      if (this.time <= constants.warningTime) { // Visually warn the player that the game is going to end in constants.warningTime seconds.
+        var floor = document.getElementById('floor');
+
+        floor.style.fill = constants.pulseColor;
+        setTimeout(this.arena.defaultFloorColor, constants.pulseDelay); // Changes the arena floor color back to its default color in constants.pulseDelay milliseconds (from now).
+        updateMessagingBox('Time to hurry, only ' + this.time + ' seconds remaining!');
+      }
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Game.prototype.start = function () {
+      /*
+        A normal function invoked by setInterval() and requestAnimationFrame() doesn't know what "this" refers to (relative to the game
+        object). The following code is the workaround. For more information, look up "JavaScript closure".
+      */
+      var gameObject = this; // Allows "this" to flow down the function scope chain so that the play() and clock() methods access the correct "this".
+
+      this.paused = false;
+      this.requestAnimationFrameID = requestAnimationFrame(function () { gameObject.play(); }); // Plays the game and resumes a paused game.
+      this.clockID = setInterval(function () { gameObject.clock(); }, 1000); // Resume the paused game clock.
+      updateMessagingBox('See the game overview for playing tips and tricks.');
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Game.prototype.levelTransitionPause = function () {
+      /*
+        This function is invoked after a small delay (to allow time for the player to read a message), and then
+        this function sets the game up for the next level.
+      */ 
+      this.balls.place(); // Place the balls in the "donut" shaped arena.
+      this.start(); // Start the game but at the new level.
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Game.prototype.nextLevel = function () {
+      /*
+        Time to go to the next level.
+      */ 
+      var gameObject = this; // For the required JavaScript closure in setTimeout().
+
+      cancelAnimationFrame(this.requestAnimationFrameID); // Halt the game.
+      clearInterval(this.clockID); // Halt the game clock.
+
+      ++this.level; // Move to the next level of difficulty.
+      updateLevel(this.level);
+
+      this.time = constants.playTime; // Each game level gets the same amount of time.
+      updateClock(this.time); // A helper function that displays the remaining game time.
+
+      updateMessagingBox(affirmingMessage(this.level) + " On to level " + this.level);
+      setTimeout(function () { gameObject.levelTransitionPause(); }, constants.affirmingMessageDelay); // This call provides a small delay so that the message the was just output via the prior line can be read by the player. Note that using an alert box here halts the ball-disappearing-animation, which is highly sub-optimal.
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    Game.prototype.init = function () {
+      /*
+        When this function is called, assumes the page is fully loaded.
+      */ 
+      if (!svgSupported()) {
+        alert("Inline SVG in HTML5 is not supported. This document requires a browser, such as Internet Explorer 9 or later, that supports HTML5 inline SVG.");
+        return;
+      }
+      this.arena.draw(); // Draw the circular "donut" shaped game arena.
+      this.balls.place(); // Place the balls in the "donut" shaped arena.
+      window.addEventListener('keydown', processKeyPress, false); // Move the paddle via the up and down arrow keys.
+      window.addEventListener('click', processMouseClick, false); // Move the paddle via the mouse.
+    }
+
+    /* -- GLOBALS -------------------------------------------------------------------------------------------- */
+
+    var game = new Game(1); // The constructor parameter indicates the initial level of game play. Note that <body onload="game.init()"> invokes the init() function.
+
+  </script>
+</body>
+
+</html>
