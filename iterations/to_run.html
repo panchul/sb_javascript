@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<body>
+<h2>JavaScript Sandbox</h2>
+<p id="demo"></p>
+<hr>
+<p id="demo2"></p>
+<hr>
+    <script>
+    function fizzBuzz(n) {
+        let output = "";
+        for (let i = 1; i <= n; i++) {
+            if (i % 3 === 0 && i % 5 === 0) {
+                output += "fizzbuzz ";
+            } else if (i % 3 === 0) {
+                output += "fizz ";
+            } else if (i % 5 === 0) {
+                output += "buzz ";
+            } else {
+                output += i + " ";
+            }
+        }
+        return output;
+    }
+    document.getElementById("demo2").innerHTML = fizzBuzz(10);
+    </script>
+
+    <script>
+        var person = [];
+        person["firstName"] = "Steve";
+        person["lastName"] = "Jobs";
+        person["age"] = 46; 
+        document.getElementById("demo").innerHTML =
+            "here goes array elements: " +  person["firstName"] + " " + person["firstName"].length;
+    </script>
+</body>
+</html> 
