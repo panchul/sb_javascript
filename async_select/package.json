@@ -1,0 +1,21 @@
+{
+    "name": "codesandboxer-example",
+    "version": "0.0.0",
+    "description": "A simple example deployed using react-codesandboxer",
+    "license": "ISC",
+    "author": "",
+    "type": "commonjs",
+    "main": "index.tsx",
+    "directories": {
+        "doc": "docs"
+    },
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "dependencies": {
+        "react": "^16.14.0",
+        "react-dom": "^16.14.0",
+        "react-select": "5.10.0"
+    },
+    "devDependencies": {}
+}
