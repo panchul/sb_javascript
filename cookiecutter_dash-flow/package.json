@@ -1,0 +1,72 @@
+{
+  "name": "dash_flows",
+  "version": "0.0.3",
+  "description": "React Flow for the Plotly Dash framework.",
+  "repository": {
+    "type": "git",
+    "url": "git://gitdash-flows.git"
+  },
+  "bugs": {
+    "url": "https://gddddows/issues"
+  },
+  "homepage": "httpddddddddddddddfash-flows",
+  "main": "build/index.js",
+  "scripts": {
+    "start": "webpack serve --config ./webpack.serve.config.js --open",
+    "validate-init": "python _validate_init.py",
+    "prepublishOnly": "npm run validate-init",
+    "build:js": "webpack --mode production",
+    "build:backends": "dash-generate-components ./src/lib/components dash_flows -p package-info.json --r-prefix '' --jl-prefix '' --ignore \\.test\\.",
+    "build:backends-activated": "(. venv/bin/activate || venv\\scripts\\activate && npm run build:backends)",
+    "build": "npm run build:js && npm run build:backends",
+    "build:activated": "npm run build:js && npm run build:backends-activated",
+    "test": "pytest"
+  },
+  "author": "Pddd <theabrahamlinkoln@ggmail.com>",
+  "license": "",
+  "dependencies": {
+    "bootstrap": "5.3.3",
+    "chromedriver": "^133.0.2",
+    "elk": "^1.0.0",
+    "elkjs": "^0.8.2",
+    "ramda": "^0.26.1",
+    "react-icons": "^5.5.0",
+    "reactflow": "^11.11.4",
+    "webdriver-manager": "^12.1.9",
+    "zustand": "^4.4.7"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.22.1",
+    "@babel/plugin-proposal-object-rest-spread": "^7.20.7",
+    "@babel/preset-env": "^7.22.2",
+    "@babel/preset-react": "^7.22.3",
+    "@plotly/dash-component-plugins": "^1.2.3",
+    "@plotly/webpack-dash-dynamic-import": "^1.2.0",
+    "ajv": "^8.12.0",
+    "ajv-keywords": "^5.1.0",
+    "babel-eslint": "^10.1.0",
+    "babel-loader": "^9.1.2",
+    "copyfiles": "^2.1.1",
+    "css-loader": "^6.8.1",
+    "eslint": "^9.15.0",
+    "eslint-config-prettier": "^6.0.0",
+    "eslint-plugin-import": "^2.18.0",
+    "eslint-plugin-react": "^7.14.2",
+    "prop-types": "^15.8.1",
+    "react": "^19.0.0",
+    "react-docgen": "^5.4.3",
+    "react-dom": "^19.0.0",
+    "react-scripts": "^3.0.1",
+    "react-select": "^5.10.0",
+    "schema-utils": "^4.2.0",
+    "style-loader": "^3.3.3",
+    "styled-jsx": "^5.1.6",
+    "webpack": "^5.97.1",
+    "webpack-cli": "^5.1.1",
+    "webpack-dev-server": "^4.15.0"
+  },
+  "engines": {
+    "node": ">=8.11.0",
+    "npm": ">=6.1.0"
+  }
+}

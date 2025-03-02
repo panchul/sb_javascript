@@ -1,0 +1,10 @@
+# Packages needed to run the tests.
+# Switch into a virtual environment
+# pip install -r requirements.txt
+
+dash[dev,testing]>=1.15.0
+dash-mantine-components>=0.15.1
+selenium>=4.2.0
+pytest>=8.3.4
+pandas
+webdriver-manager

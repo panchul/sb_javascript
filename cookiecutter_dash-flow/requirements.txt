@@ -1,0 +1,4 @@
+# dash is required to call `build:py`
+dash[dev,testing]>=2.0.0
+dash-mantine-components==0.15.1
+pandas>=2.2.3
