@@ -16,13 +16,13 @@ import { set } from 'ramda';
  */
 //const BananaNode = memo(({ id, initial_data, selected }) => {
 //const BananaNode = ({ id, initial_data }) => {
-function BananaNode({ id, data }) {
+function BananaNode({ id, data, selected }) {
 
-    const { updateNodeData } = useReactFlow();
+    // not in this version of ReactFlow
+    //const { updateNodeData } = useReactFlow();
     const [data_local, setData] = useState(data);
 
-    const selected = false;
-
+    //const selected = false;
     
     const renderDashComponent = (component) => {
         if (!component) return null;
@@ -118,9 +118,10 @@ function BananaNode({ id, data }) {
             ...data,
             metric: evt.target.value
         }));
-        updateNodeData(id, { metric: evt.target.value });
-    }, []);
 
+        data.updateNodeData(id, { metric: evt.target.value });
+    }, [id, data]);
+    
     //console.log("the options now:",
     //    data.dependsOnOptions ? data.dependsOnOptions.filter(
     //        (option) => option.value != data.node_id)
@@ -168,8 +169,8 @@ function BananaNode({ id, data }) {
 
                             }}>...</button>
                             <button onClick={() => {
-                                console.log("node's button delete");
-                                data_local.onDelete(data_local.node_id);
+                                console.log("node's button delete, data_local and data: ", data_local, data);
+                                data.onDelete(id); // data_local? id?
                             }}>X</button>
                         </div>
                     </div>
@@ -281,11 +282,13 @@ BananaNode.propTypes = {
     */
     data: PropTypes.shape({
         label: PropTypes.any,
-        depends_on: PropTypes.array, // we also have the dependsOnOptions (?)
+        metric: PropTypes.string,
+        depends_on: PropTypes.array,
         node_id: PropTypes.string,
         onChange: PropTypes.func,
         onDelete: PropTypes.func,
-        dependsOnOptions: PropTypes.any
+        updateNodeData: PropTypes.func.isRequired,
+        dependsOnOptions: PropTypes.array
     }).isRequired,
 
     /**
@@ -295,13 +298,17 @@ BananaNode.propTypes = {
 };
 
 BananaNode.defaultProps = {
-    id: 'undef',
-    selected: false,
     data: {
         label: "undef",
+        metric: "",
         depends_on: [],
-        node_id: "undef"
-    }
+        node_id: "undef",
+        onChange: () => {},
+        onDelete: () => {},
+        updateNodeData: () => {},
+        dependsOnOptions: []
+    },
+    selected: false,
 };
 
 export default BananaNode

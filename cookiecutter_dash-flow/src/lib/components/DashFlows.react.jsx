@@ -211,6 +211,14 @@ const FlowWithProvider = (props) => {
         }
     }, [edges]);
 
+    const updateNodeData = (nodeId, newData) => {
+        setNodes((nodes) =>
+            nodes.map((node) =>
+                node.id === nodeId ? { ...node, data: { ...node.data, ...newData } } : node
+            )
+        );
+    };
+
     const onChange = (newValue, actionMeta, node_id) => {
 
         let field;
@@ -246,16 +254,19 @@ const FlowWithProvider = (props) => {
     };
 
     const onDelete = (node_id) => {
-        setNodes((nds) => nds.filter((node) => node.id != node_id));
-        setEdges((eds) => eds.filter((edge) => edge.source != node_id && edge.target != node_id));
-        setNodes((nds) =>
-            nds.map((node) => {
-                return {
-                    ...node,
-                    depends_on: (node.depends_on || []).filter((dep) => dep != node_id)
-                };
-            }
-            ));
+        setNodes((nds) => {
+            // Filter out the node to be deleted
+            const filteredNodes = nds.filter((node) => node.id !== node_id);
+
+            // Update the depends_on property of the remaining nodes
+            return filteredNodes.map((node) => ({
+                ...node,
+                depends_on: (node.depends_on || []).filter((dep) => dep !== node_id),
+            }));
+        });
+
+        // Filter out the edges connected to the deleted node
+        setEdges((eds) => eds.filter((edge) => edge.source !== node_id && edge.target !== node_id));
     };
 
     const updatedDependsOnOptions = (nds) => nds.map((node) => {
@@ -267,18 +278,17 @@ const FlowWithProvider = (props) => {
 
     useEffect(() => {
         setNodes((nds) =>
-            nds.map((node) => {
-                return {
+            nds.map((node) => ({
                     ...node,
                     data: {
                         ...node.data,
                         onChange: onChange,
+                        updateNodeData: updateNodeData,
                         onDelete: onDelete,
                         dependsOnOptions: updatedDependsOnOptions(nds)
                     }
-                };
-            }));
-    }, [setNodes]); // nodes too?
+            }))
+        )}, [nodes, updatedDependsOnOptions]);
 
     const onConnect = useCallback(
         (params) => {
@@ -309,7 +319,7 @@ const FlowWithProvider = (props) => {
             //    //edges: [...edges, newEdge],
             //    wholeGraph: JSON.stringify({ newNodes, newEdges }),
             //});
-        }, [setEdges, setNodes]); // (?) nodes and edges too? We json.stringify them.
+        }, [setEdges, setNodes, nodes, edges]);
 
 
     const generateNewNode = (params) => {
@@ -327,6 +337,7 @@ const FlowWithProvider = (props) => {
                 metric: `${25 * params.counter} m`,
                 node_id: newid,
                 onChange: onChange,
+                updateNodeData: updateNodeData,
                 onDelete: onDelete,
                 dependsOnOptions: updatedDependsOnOptions(nodes)
             }
@@ -422,28 +433,28 @@ const FlowWithProvider = (props) => {
     return (
         <div style={{ width: '100%', height: '600px', ...props.style }}>
             <ReactFlowProvider>
-            <ReactFlow
-                nodeTypes={nodeTypes}
-                edgeTypes={edgeTypes}
-                nodes={processedNodes}
-                edges={edges}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                onConnect={onConnect}
-                nodesDraggable={props.nodesDraggable}
-                nodesConnectable={props.nodesConnectable}
-                elementsSelectable={props.elementsSelectable}
-                fitView
-            >
-                {props.showControls && <Controls />}
-                {props.showMiniMap && <MiniMap />}
-                {props.showBackground && <Background />}
-                {props.showDevTools && <DevTools
-                    viewport={useViewport()}
+                <ReactFlow
+                    nodeTypes={nodeTypes}
+                    edgeTypes={edgeTypes}
                     nodes={processedNodes}
-                    onAddNode={onAddNode}
-                />}
-            </ReactFlow>
+                    edges={edges}
+                    onNodesChange={onNodesChange}
+                    onEdgesChange={onEdgesChange}
+                    onConnect={onConnect}
+                    nodesDraggable={props.nodesDraggable}
+                    nodesConnectable={props.nodesConnectable}
+                    elementsSelectable={props.elementsSelectable}
+                    fitView
+                >
+                    {props.showControls && <Controls />}
+                    {props.showMiniMap && <MiniMap />}
+                    {props.showBackground && <Background />}
+                    {props.showDevTools && <DevTools
+                        viewport={useViewport()}
+                        nodes={processedNodes}
+                        onAddNode={onAddNode}
+                    />}
+                </ReactFlow>
             </ReactFlowProvider>
         </div>
     );

@@ -9,14 +9,16 @@ A BananaNode component.
 ddd
 Keyword arguments:
 - `id` (String; optional): ddd
-- `data` (optional): ddd. data has the following type: lists containing elements 'label', 'depends_on', 'node_id', 'onChange', 'onDelete', 'dependsOnOptions'.
+- `data` (optional): ddd. data has the following type: lists containing elements 'label', 'metric', 'depends_on', 'node_id', 'onChange', 'onDelete', 'updateNodeData', 'dependsOnOptions'.
 Those elements have the following types:
   - `label` (Bool | Real | String | Dict | Array; optional)
+  - `metric` (String; optional)
   - `depends_on` (Array; optional)
   - `node_id` (String; optional)
   - `onChange` (optional)
   - `onDelete` (optional)
-  - `dependsOnOptions` (Bool | Real | String | Dict | Array; optional)
+  - `updateNodeData` (required)
+  - `dependsOnOptions` (Array; optional)
 - `selected` (Bool; optional): ddd
 """
 function banananode(; kwargs...)
