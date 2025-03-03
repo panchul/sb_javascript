@@ -18,7 +18,34 @@ Keyword arguments:
 - `showControls` (Bool; optional): Show/hide the control panel
 - `showDevTools` (Bool; optional): Show/hide the developer tools panel
 - `showMiniMap` (Bool; optional): Show/hide the minimap navigation component
-- `style` (Dict; optional): Custom CSS styles for the container div
+- `style` (Dict; optional): Array of nodes to display in the flow
+/
+    nodes: PropTypes.arrayOf(PropTypes.shape({
+        id: PropTypes.string.isRequired,
+        type: PropTypes.string,
+        data: PropTypes.object.isRequired,
+        position: PropTypes.shape({
+            x: PropTypes.number.isRequired,
+            y: PropTypes.number.isRequired
+        }).isRequired,
+        style: PropTypes.object
+    })),
+    
+
+    /**
+Array of edges defining connections between nodes
+/
+    edges: PropTypes.arrayOf(PropTypes.shape({
+        id: PropTypes.string.isRequired,
+        source: PropTypes.string.isRequired,
+        target: PropTypes.string.isRequired,
+        type: PropTypes.string,
+        data: PropTypes.object,
+        style: PropTypes.object
+    })),
+
+     /**
+Custom CSS styles for the container div
 - `wholeGraph` (String; optional): wakawaka
 """
 function dashflows(; kwargs...)

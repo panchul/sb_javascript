@@ -1,9 +1,9 @@
 # AUTO GENERATED FILE - DO NOT EDIT
 
 #' @export
-bananaNode <- function(data=NULL, selected=NULL) {
+bananaNode <- function(id=NULL, data=NULL, selected=NULL) {
     
-    props <- list(data=data, selected=selected)
+    props <- list(id=id, data=data, selected=selected)
     if (length(props) > 0) {
         props <- props[!vapply(props, is.null, logical(1))]
     }
@@ -11,7 +11,7 @@ bananaNode <- function(data=NULL, selected=NULL) {
         props = props,
         type = 'BananaNode',
         namespace = 'dash_flows',
-        propNames = c('data', 'selected'),
+        propNames = c('id', 'data', 'selected'),
         package = 'dashFlows'
         )
 

@@ -13,19 +13,20 @@ import {
     //} from '@xyflow/react';
 } from 'reactflow';
 
-//import '@xyflow/react/dist/style.css';
 import 'reactflow/dist/style.css';
+//import '@xyflow/react/dist/style.css';
+
 import { FaPencilAlt } from 'react-icons/fa';
 import CreatableSelect from 'react-select/creatable';
 import ELK from 'elkjs/lib/elk.bundled.js';
 
-import ResizableNode from './ResizableNode';
-import AnimatedCircleNode from './AnimatedCircleNode';
-import DevTools from './DevTools';
-import AnimatedNodeEdge from './AnimatedNodeEdge';
-import BananaNode from './BananaNode.react';
+import ResizableNode from './ResizableNode.js';
+import AnimatedCircleNode from './AnimatedCircleNode.js';
+import DevTools from './DevTools.jsx';
+import AnimatedNodeEdge from './AnimatedNodeEdge.js';
+import BananaNode from './BananaNode.react.jsx';
 
-import {getJsonFromString, getStringFromJson} from '../utils/marshaling';
+import {getJsonFromString, getStringFromJson} from '../utils/marshaling.js';
 
 // Initialize ELK
 const elk = new ELK();
@@ -115,66 +116,8 @@ const processDashComponents = (nodes) => {
  * ddd
  */
 const FlowWithProvider = (props) => {
-
-    const getGraphJson = () => {
-
-        try {
-            const res = getJsonFromString(props.wholeGraph);
-
-            if (res.nodes == undefined) {
-                console.log("unexpected res.nodes == undefined");
-            }
-
-            if (res.edges == undefined) {
-                console.log("unexpected res.edges == undefined");
-            }
-            return res;
-        } catch (error) {
-            console.log('failed to parse graph json:', error);
-            return [];
-        }
-    }
-
-    const parseGraphAndGetNodes = () => {
-        try {
-            return getGraphJson().nodes.filter(
-                (n) => n.type && n.type == "banana").map(
-                    (node) =>
-                    ({
-                        id: node.id,
-                        type: node.type,
-                        position: node.position,
-                        data: {
-                            label: node.data.label,
-                            metric: node.data.metric,
-                            depends_on: node.data.depends_on || [],
-                            node_id: node.id // otherwise it is not clear how the node class knows what it is
-                        },
-                    })
-                );
-        } catch (error) {
-            console.log('failed to parse graph and get the nodes:', error);
-            return [];
-        }
-    };
-
-    const parseGraphAndGetEdges = () => {
-        try {
-            return getGraphJson().edges.map((edge) =>
-            ({
-                id: edge.id,
-                source: edge.source,
-                target: edge.target,
-            })
-            );
-        } catch (error) {
-            console.log('failed to parse graph and get the edges:', error);
-            return [];
-        }
-    };
-
-    const [nodes, setNodes, onNodesChange] = useNodesState(parseGraphAndGetNodes());
-    const [edges, setEdges, onEdgesChange] = useEdgesState(parseGraphAndGetEdges());
+    const [nodes, setNodes, onNodesChange] = useNodesState(props.nodes);
+    const [edges, setEdges, onEdgesChange] = useEdgesState(props.edges);
     const { setViewport } = useViewport();
 
     const applyLayout = async (options) => {
@@ -249,26 +192,24 @@ const FlowWithProvider = (props) => {
     }, [props.layoutOptions]);
 
     useEffect(() => {
-        //if (props.nodes !== nodes) {
+        if (props.nodes !== nodes) {
             //console.log('new nodes:', nodes);
             props.setProps({
-                // nodes,
-                wholeGraph: JSON.stringify({ nodes, edges })
+                nodes,
+                //wholeGraph: JSON.stringify({ nodes, edges })
             });
-        //}
-    }, [nodes, edges]);
+        }
+    }, [nodes]);
 
-    /*
     useEffect(() => {
         if (props.edges !== edges) {
             //console.log('new edges:', edges);
             props.setProps({
                 edges,
-                wholeGraph: JSON.stringify({ nodes, edges })
+                //wholeGraph: JSON.stringify({ nodes, edges })
             });
         }
     }, [edges]);
-    */
 
     const onChange = (newValue, actionMeta, node_id) => {
 
@@ -363,11 +304,11 @@ const FlowWithProvider = (props) => {
             });
             setEdges(newEdges);
             setNodes(newNodes);
-            props.setProps({
-                //nodes,
-                //edges: [...edges, newEdge],
-                wholeGraph: JSON.stringify({ newNodes, newEdges }),
-            });
+            //props.setProps({
+            //    //nodes,
+            //    //edges: [...edges, newEdge],
+            //    wholeGraph: JSON.stringify({ newNodes, newEdges }),
+            //});
         }, [setEdges, setNodes]); // (?) nodes and edges too? We json.stringify them.
 
 
@@ -398,9 +339,10 @@ const FlowWithProvider = (props) => {
             const newNode = generateNewNode(params);
             setNodes((nds) => [...nds, newNode]);
 
+            /*
             props.setProps({
-                //nodes: [...nodes, newNode],
-                //edges: edges,
+                nodes: [...nodes, newNode],
+                edges: edges,
                 wholeGraph: JSON.stringify(
                     {
                         nodes: [...nodes, newNode],
@@ -408,6 +350,7 @@ const FlowWithProvider = (props) => {
                     }
             )
             });
+            */
         },
         [setNodes]
     );
@@ -432,11 +375,13 @@ const FlowWithProvider = (props) => {
                     return node;
                 }));
 
+            /*
             props.setProps({
                 nodes: nodes.filter((node) => node.id !== nodeId),
                 edges: edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId),
                 wholeGraph: JSON.stringify({ nodes, edges })
             });
+            */
         },
         [setNodes, setEdges]
     );
@@ -461,11 +406,13 @@ const FlowWithProvider = (props) => {
                     return node;
                 }));
 
+            /*
             props.setProps({
                 nodes: nodes,
                 edges: edges.filter((edge) => edge.id !== edgeId),
                 wholeGraph: JSON.stringify({ nodes, edges })
             });
+            */
         },
         [setNodes, setEdges]
     );
@@ -474,14 +421,15 @@ const FlowWithProvider = (props) => {
 
     return (
         <div style={{ width: '100%', height: '600px', ...props.style }}>
+            <ReactFlowProvider>
             <ReactFlow
+                nodeTypes={nodeTypes}
+                edgeTypes={edgeTypes}
                 nodes={processedNodes}
                 edges={edges}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
-                nodeTypes={nodeTypes}
-                edgeTypes={edgeTypes}
                 nodesDraggable={props.nodesDraggable}
                 nodesConnectable={props.nodesConnectable}
                 elementsSelectable={props.elementsSelectable}
@@ -496,6 +444,7 @@ const FlowWithProvider = (props) => {
                     onAddNode={onAddNode}
                 />}
             </ReactFlow>
+            </ReactFlowProvider>
         </div>
     );
 };
@@ -504,11 +453,80 @@ const FlowWithProvider = (props) => {
  * ddd
  */
 const DashFlows = (props) => {
+
+    const getGraphJson = () => {
+        try {
+            const res = getJsonFromString(props.wholeGraph);
+
+            if (res.nodes == undefined) {
+                console.log("unexpected res.nodes == undefined");
+            }
+
+            if (res.edges == undefined) {
+                console.log("unexpected res.edges == undefined");
+            }
+            return res;
+        } catch (error) {
+            console.log('failed to parse graph json:', error);
+            return [];
+        }
+    }
+
+    const parseGraphAndGetNodes = () => {
+        try {
+            console.log("parseGraphAndGetNodes()...");
+            return getGraphJson().nodes.filter(
+                (n) => n.type && n.type == "banana").map(
+                    (node) =>
+                    ({
+                        id: node.id,
+                        type: node.type,
+                        position: node.position,
+                        data: {
+                            label: node.data.label,
+                            metric: node.data.metric,
+                            depends_on: node.data.depends_on || [],
+                            node_id: node.id // otherwise it is not clear how the node class knows what it is
+                        },
+                    })
+                );
+        } catch (error) {
+            console.log('failed to parse graph and get the nodes:', error);
+            return [];
+        }
+    };
+
+    const parseGraphAndGetEdges = () => {
+        try {
+            console.log("parseGraphAndGetEdges()...");
+            return getGraphJson().edges.map((edge) =>
+            ({
+                id: edge.id,
+                source: edge.source,
+                target: edge.target,
+            })
+            );
+        } catch (error) {
+            console.log('failed to parse graph and get the edges:', error);
+            return [];
+        }
+    };
+
+    const effective_nodes= parseGraphAndGetNodes();
+    const effective_edges= parseGraphAndGetEdges();
+
+    console.log("effective_nodes: ", effective_nodes);
+    console.log("effective_edges: ", effective_edges);
+
     return (
         <div id={props.id}>
-            <ReactFlowProvider>
-                <FlowWithProvider {...props} />
-            </ReactFlowProvider>
+            // <ReactFlowProvider>
+                <FlowWithProvider 
+                    {...props}
+                    nodes={effective_nodes}
+                    edges={effective_edges}
+                />
+            // </ReactFlowProvider>
         </div>
     );
 };
@@ -583,7 +601,7 @@ DashFlows.propTypes = {
         }).isRequired,
         style: PropTypes.object
     })),
-    */
+    
 
     /**
      * Array of edges defining connections between nodes
@@ -596,9 +614,8 @@ DashFlows.propTypes = {
         data: PropTypes.object,
         style: PropTypes.object
     })),
-    */
 
-    /**
+     /**
      * Custom CSS styles for the container div
      */
     style: PropTypes.object,

@@ -15,6 +15,7 @@ Get started with:
    - `pip install virtualenv`
    - `virtualenv venv`
    - `. venv/bin/activate`
+   - `pip install --upgrade pip`
 3. Run `pip install -r requirements.txt`
 4. Run `npm install`
 5. Run `npm run build`

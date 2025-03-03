@@ -1,16 +1,29 @@
 // BananaNode.js
 import React, { memo, useMemo, useEffect, useCallback, useState } from 'react';
 import PropTypes from 'prop-types';
-import { Handle, Position, NodeResizer } from 'reactflow';
+import { Handle,
+    Position,
+    NodeResizer,
+    useReactFlow,
+    ReactFlowProvider } from 'reactflow';
 import CreatableSelect from 'react-select/creatable';
 import { FaPencilAlt } from 'react-icons/fa';
+import { set } from 'ramda';
 
 
 /**
  * ddd
  */
-const BananaNode = memo(({ data, selected }) => {
+//const BananaNode = memo(({ id, initial_data, selected }) => {
+//const BananaNode = ({ id, initial_data }) => {
+function BananaNode({ id, data }) {
 
+    const { updateNodeData } = useReactFlow();
+    const [data_local, setData] = useState(data);
+
+    const selected = false;
+
+    
     const renderDashComponent = (component) => {
         if (!component) return null;
         if (typeof component === 'string') return component;
@@ -98,11 +111,20 @@ const BananaNode = memo(({ data, selected }) => {
         console.warn('Could not process component:', component);
         return null;
     };
+    
 
-    console.log("the options now:",
-        data.dependsOnOptions ? data.dependsOnOptions.filter(
-            (option) => option.value != data.node_id)
-            : []);
+    const onChange = useCallback((evt) => {
+        setData((data) => ({
+            ...data,
+            metric: evt.target.value
+        }));
+        updateNodeData(id, { metric: evt.target.value });
+    }, []);
+
+    //console.log("the options now:",
+    //    data.dependsOnOptions ? data.dependsOnOptions.filter(
+    //        (option) => option.value != data.node_id)
+    //        : []);
 
     return (
         <div style={{
@@ -139,20 +161,20 @@ const BananaNode = memo(({ data, selected }) => {
                         <div style={{ display: 'flex', algnItems: 'center', justifyContent: 'flex-end' }}>
                             <button onClick={() => {
                                 console.log("node's button props");
-                                console.log("data: ", data);
+                                console.log("data: ", data_local);
 
-                                alert("no workie yet. here's the data:", data );
+                                alert("no workie yet. here's the data:", data_local );
 
 
                             }}>...</button>
                             <button onClick={() => {
                                 console.log("node's button delete");
-                                data.onDelete(data.node_id);
+                                data_local.onDelete(data_local.node_id);
                             }}>X</button>
                         </div>
                     </div>
                     <div>
-                        <b>{data.label && renderDashComponent(data.label)}</b>
+                        <b>{data_local.label && renderDashComponent(data_local.label)}</b>
                     </div>
                     <div>
                         <input
@@ -170,12 +192,14 @@ const BananaNode = memo(({ data, selected }) => {
                         <input
                             name="metric"
                             style={{ background: '#555' }}
-                            value={data.metric}
-                            onChange={(newValue,actionMeta)=>{
+                            value={data_local.metric}
+                            onChange= {onChange}
+                            /*{(newValue,actionMeta)=>{
                                     console.log("onChange of the metric field for data.node_id ", data.node_id);
                                     data.onChange(newValue, actionMeta, data.node_id);
                                 }
                             }
+                            */
                             />
                     </div>
                     <div>
@@ -199,22 +223,22 @@ const BananaNode = memo(({ data, selected }) => {
                             isMulti
                             value={
                                 (
-                                    data.dependsOnOptions ? data.dependsOnOptions.filter(
-                                        (option) => data.depends_on.includes(option.value)
+                                    data_local.dependsOnOptions ? data_local.dependsOnOptions.filter(
+                                        (option) => data_local.depends_on.includes(option.value)
                                     )
                                         : []
                                 )
                             }
                             options={
                                 (
-                                    data.dependsOnOptions ? data.dependsOnOptions.filter(
-                                        (option) => option.value != data.node_id)
+                                    data_local.dependsOnOptions ? data_local.dependsOnOptions.filter(
+                                        (option) => option.value != data_local.node_id)
                                         : []
                                 )
                             }
                             onChange={
                                 (newValue, actionMeta) =>
-                                    data.onChange(newValue, actionMeta, data.node_id)
+                                    data_local.onChange(newValue, actionMeta, data_local.node_id)
                             }
                             isClearable
                         />
@@ -241,11 +265,17 @@ const BananaNode = memo(({ data, selected }) => {
             />
         </div>
     );
-});
+}
+//});
 
 BananaNode.displayName = 'BananaNode';
 
 BananaNode.propTypes = {
+    /**
+     * ddd
+     * */
+    id: PropTypes.string,
+
     /**
     * ddd
     */
@@ -265,6 +295,7 @@ BananaNode.propTypes = {
 };
 
 BananaNode.defaultProps = {
+    id: 'undef',
     selected: false,
     data: {
         label: "undef",

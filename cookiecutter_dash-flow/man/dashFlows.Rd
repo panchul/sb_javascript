@@ -38,7 +38,34 @@ wholeGraph=NULL)
 
 \item{showMiniMap}{Logical. Show/hide the minimap navigation component}
 
-\item{style}{Named list. Custom CSS styles for the container div}
+\item{style}{Named list. Array of nodes to display in the flow
+/
+    nodes: PropTypes.arrayOf(PropTypes.shape({
+        id: PropTypes.string.isRequired,
+        type: PropTypes.string,
+        data: PropTypes.object.isRequired,
+        position: PropTypes.shape({
+            x: PropTypes.number.isRequired,
+            y: PropTypes.number.isRequired
+        }).isRequired,
+        style: PropTypes.object
+    })),
+    
+
+    /**
+Array of edges defining connections between nodes
+/
+    edges: PropTypes.arrayOf(PropTypes.shape({
+        id: PropTypes.string.isRequired,
+        source: PropTypes.string.isRequired,
+        target: PropTypes.string.isRequired,
+        type: PropTypes.string,
+        data: PropTypes.object,
+        style: PropTypes.object
+    })),
+
+     /**
+Custom CSS styles for the container div}
 
 \item{wholeGraph}{Character. wakawaka}
 }

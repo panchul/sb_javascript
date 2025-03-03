@@ -10,10 +10,12 @@ ddd
 }
 
 \usage{
-bananaNode(data=NULL, selected=NULL)
+bananaNode(id=NULL, data=NULL, selected=NULL)
 }
 
 \arguments{
+\item{id}{Character. ddd}
+
 \item{data}{Lists containing elements 'label', 'depends_on', 'node_id', 'onchange', 'ondelete', 'dependsonoptions'.
 those elements have the following types:
   - label (logical | numeric | character | named list | unnamed list; optional)
