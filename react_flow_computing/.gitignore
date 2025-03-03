@@ -1,0 +1,7 @@
+*.swp
+node_modules
+venv
+build
+package-lock.json
+
+
