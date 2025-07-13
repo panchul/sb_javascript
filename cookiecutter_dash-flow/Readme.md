@@ -22,9 +22,10 @@ Get started with:
 6. Run `python usage.py`
 7. Visit [http://localhost:8080](http://localhost:8080) in your web browser
 
+8. Run `pip install -r tests/requirements.txt` (might need to check [Chromedriver](https://github.com/panchul/workspace/tree/main/doc/Selenium.md#chromedriver))
+9. Run `pytest` to run tests.
 
 Below is the cookiecutter's template for Readme.md, some thing are useful:
-
 
 ### Install dependencies
 
