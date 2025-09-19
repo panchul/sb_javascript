@@ -14,4 +14,6 @@ I will gradually migrate the notes I have to this repository. So far the here ar
        with the navigation done using javascript header/footer
        
        
-     
+
+See also some Plotly Dash examples in sb_python repo.
+
